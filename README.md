@@ -4,6 +4,33 @@ A local Windows desktop app for researching jobs, tracking applications and prep
 
 **[Download the Windows EXE](https://github.com/gukhoe/jobtracker/releases/latest)** · [MIT license](LICENSE) · [Privacy](PRIVACY.md)
 
+## Overview
+
+JobTracker brings job discovery, company research, application tracking and resume preparation into one personal desktop workspace. Instead of maintaining separate spreadsheets, folders and AI conversations, you can keep opportunities, source resumes, generated drafts and workflow history together on your own computer.
+
+The application starts with an empty workspace. You define your profile, experience, target roles, locations and salary preferences, then connect the AI provider you want to use. There are no built-in assumptions about your employer, profession, industry or country, and you can maintain separate profiles for different searches.
+
+## Key features
+
+- **Personal job database:** save opportunities, source links, job descriptions, salary ranges, application notes and follow-up dates.
+- **Company research:** maintain company records, industries, locations, careers links and research notes.
+- **Flexible AI connections:** use OpenAI, Claude, Gemini, Grok, local Ollama, an OpenAI-compatible endpoint or your separately installed Codex CLI.
+- **Repeatable research:** collect public Lever and Greenhouse postings, or enable optional Brave Search and AI classification to discover additional leads.
+- **Scheduled workflows:** choose weekdays, execution time, timezone, source resume and the number of AI jobs processed per run.
+- **Resume and cover-letter drafts:** generate documents from your verified experience and the selected job requirements while keeping source resumes unchanged.
+- **Human review and approval:** approve a job before tailored document generation, review generated text and record actual application evidence separately.
+- **Local storage and backups:** retain your data in SQLite, back up your workspace and save API keys with Windows account-bound encryption.
+
+## How the workflow fits together
+
+**Set your preferences → research opportunities → review and approve a job → generate documents → review and export → apply on the official website → track the outcome.**
+
+Research and document preparation can run on a schedule while the app is open. Newly discovered jobs are saved for review; approval is tied to the current job requirements, so a changed listing needs approval again. Each workflow records its outcome and any errors in Activity. The app assists with preparation and organization; final applications remain a human action.
+
+## Who it is for
+
+JobTracker is designed for individual job seekers who want an editable, local workspace and the freedom to choose their AI provider. You can use it for a focused search in one city, a remote-job search, a career change or opportunities across multiple regions and industries. It is a personal desktop application, rather than a shared recruiting system or a hosted multi-user service.
+
 ## Start
 
 1. Download `JobTracker.exe` from Releases and run it. Python and a web server are not required.

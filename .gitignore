@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+*.sqlite*
+*.db
+.env*
+!.env.example
+data/
+private/
+*.log
+.impeccable/

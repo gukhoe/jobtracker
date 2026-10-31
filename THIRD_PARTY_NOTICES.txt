@@ -1,0 +1,33 @@
+JobTracker application source is distributed under the MIT License.
+Bundled dependencies retain their own licenses; see the licenses/ directory.
+
+Runtime components:
+- Python: Python Software Foundation license and incorporated third-party notices.
+- Tcl/Tk: permissive Tcl/Tk licenses and incorporated notices.
+- SQLite: public domain (https://sqlite.org/copyright.html).
+- OpenSSL 3.x: Apache-2.0; see OpenSSL-LICENSE.txt.
+- libffi: MIT; see libffi-LICENSE.txt.
+- Windows Universal CRT / Visual C++ runtime: Microsoft redistributable runtime
+  components supplied with the Python Windows distribution; these remain under
+  Microsoft's applicable runtime redistribution terms, not this app's MIT license.
+- pypdf: BSD-3-Clause.
+- tzdata: Apache-2.0 package; IANA timezone database public-domain data.
+
+Build/bootloader components:
+- PyInstaller: GPL-2.0-or-later with a bootloader exception allowing distribution
+  of bundled applications under the application's chosen license.
+- altgraph: MIT.
+- packaging: Apache-2.0 OR BSD-2-Clause.
+- pefile: MIT.
+- pyinstaller-hooks-contrib: GPL-2.0-or-later AND Apache-2.0 (hook exception).
+- pywin32-ctypes: BSD-3-Clause.
+
+No AI provider SDK, model weights, CLI executable or credentials are bundled.
+Connected services and locally installed models have their own terms. The MIT
+license for this application grants no rights to third-party job listings,
+user resumes, provider services or model weights.
+
+Authoritative licensing references:
+https://opensource.org/license/mit
+https://pyinstaller.org/en/stable/license.html
+https://docs.python.org/3/license.html

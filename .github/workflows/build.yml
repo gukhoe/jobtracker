@@ -1,0 +1,20 @@
+name: Windows build
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m venv .venv
+      - run: .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+      - run: .\.venv\Scripts\python.exe scripts/collect_licenses.py
+      - run: .\scripts\build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JobTracker-Windows
+          path: dist/JobTracker.exe

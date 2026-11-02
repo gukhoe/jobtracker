@@ -29,7 +29,8 @@ class LocalAITests(unittest.TestCase):
                 self.assertEqual(len([c for c in found if c['provider']=='Claude CLI']),1)
                 gemini=next(c for c in found if c['provider']=='Gemini CLI')
                 self.assertEqual(gemini['cli_command'],[str((node/'node.exe').resolve()),str((package/'bundle/gemini.js').resolve())])
-                self.assertTrue(all(str(home) in ' '.join(c['cli_command']) for c in found))
+                # Hosted Windows runners can resolve TEMP's short-name/junction path.
+                self.assertTrue(all(all(Path(p).is_relative_to(home.resolve()) for p in c['cli_command']) for c in found))
 
     def test_bad_manifest_cannot_escape_package_and_no_node_no_gemini(self):
         with tempfile.TemporaryDirectory() as folder:

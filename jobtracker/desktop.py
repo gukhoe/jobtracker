@@ -16,6 +16,7 @@ from . import __version__
 from .ai import PROVIDERS, protect, validate_url
 from .store import Store, STATES, salary_class, now
 from .workflow import Workflow, next_due
+from .local_ai import CLI_PROVIDERS, discover, inspect_cli, launch_command, validate_model
 
 class Form(tk.Toplevel):
     def __init__(self, app, title, fields, values, callback):
@@ -58,6 +59,116 @@ class Form(tk.Toplevel):
             self.destroy()
         except Exception as exc:
             messagebox.showerror('Check your settings',str(exc),parent=self)
+
+class LocalAISetup(tk.Toplevel):
+    DEFAULT = 'Use CLI configured default'
+
+    def __init__(self, app, candidates):
+        super().__init__(app)
+        self.app, self.profile, self.candidates = app,app.pid,candidates
+        self.title('Detect and connect local AI')
+        self.geometry('980x670'); self.minsize(820,620)
+        self.transient(app)
+        body = ttk.Frame(self,padding=18); body.pack(fill='both',expand=True)
+        ttk.Label(body,text='Connect an installed AI',font=('Segoe UI',16,'bold')).pack(anchor='w')
+        ttk.Label(body,text='Detection checks this user’s PATH and standard installation folders. Select a trusted installation, inspect it, then connect.\nNo tokens are read or copied. CLI installation and successful sign-in are separate checks.',wraplength=920).pack(anchor='w',pady=10)
+        self.tree = app.tree(body,('Provider','Installation','Source'))
+        self.tree.configure(height=5)
+        self.tree.column('Installation',width=540)
+        for index,c in enumerate(candidates):
+            self.tree.insert('','end',iid=str(index),values=(c['provider'],' → '.join(c['cli_command']),c['source']))
+        self.tree.bind('<<TreeviewSelect>>',self.changed)
+        modelbar = ttk.Frame(body); modelbar.pack(fill='x',pady=10)
+        ttk.Label(modelbar,text='Model').pack(side='left',padx=(0,16))
+        self.model = ttk.Combobox(modelbar,values=(self.DEFAULT,),width=55)
+        self.model.set(self.DEFAULT); self.model.pack(side='left')
+        self.allow = tk.BooleanVar(value=bool(app.flow.config(self.profile).get('allow_ai')))
+        ttk.Checkbutton(body,text='Allow this profile and selected resume/job data to the chosen AI for document tasks',variable=self.allow).pack(anchor='w',pady=6)
+        self.status = tk.StringVar(value='Choose an installation. Inspecting does not perform AI inference.' if candidates else 'No supported installation found. Install Codex, Claude Code, Gemini CLI or Ollama, sign in separately and scan again.')
+        ttk.Label(body,textvariable=self.status,wraplength=920).pack(anchor='w',pady=10)
+        ttk.Label(body,text='Leave the model blank/default to use CLI configuration. Catalog entries do not guarantee account access.\nOllama requires a running local server and an installed model. Brave web research still needs its own key.',wraplength=920).pack(anchor='w',pady=6)
+        actions = ttk.Frame(body); actions.pack(fill='x',pady=8)
+        self.inspect_button = ttk.Button(actions,text='Inspect selected installation',command=self.inspect)
+        self.inspect_button.pack(side='left',padx=(0,8))
+        ttk.Button(actions,text='Connect selected',command=self.connect).pack(side='right',padx=(8,0))
+        ttk.Button(actions,text='Cancel',command=self.destroy).pack(side='right')
+        self.results = queue.Queue(); self.working = False
+        self.timer = self.after(150,self.poll)
+        if candidates:
+            preferred = next((i for i,c in enumerate(candidates) if c['provider'] == app.flow.config(self.profile).get('provider')),0)
+            self.tree.selection_set(str(preferred))
+        self.grab_set()
+
+    def changed(self,*args):
+        self.model['values'] = (self.DEFAULT,)
+        self.model.set(self.DEFAULT)
+        self.status.set('Selected installation not inspected yet. CLI default will be used unless you enter an exact model ID.')
+
+    def candidate(self):
+        choice = self.tree.selection()
+        if not choice:
+            raise ValueError('Select an installation first.')
+        return self.candidates[int(choice[0])]
+
+    def inspect(self):
+        try:
+            candidate = self.candidate()
+            if self.working:
+                return
+            self.working = True; self.inspect_button.configure(state='disabled')
+            self.status.set('Checking version, sign-in status where supported, and model metadata…')
+            def worker():
+                try:
+                    result = inspect_cli(candidate)
+                    if candidate['provider'] == 'Ollama':
+                        from .ai import request_json
+                        try:
+                            data = request_json('http://127.0.0.1:11434/api/tags',timeout=3)
+                            result['models'] = [m['name'] for m in data.get('models',[]) if m.get('name')]
+                            result['authentication'] = 'Local server reachable'
+                        except Exception:
+                            result['authentication'] = 'Local server not reachable; start Ollama before connecting'
+                    self.results.put((candidate,result))
+                except Exception:
+                    self.results.put((candidate,{'version':'Unknown','authentication':'Check failed. Verify the installation in a terminal.','models':[]}))
+            threading.Thread(target=worker,daemon=True).start()
+        except ValueError as exc:
+            messagebox.showerror('Select an installation',str(exc),parent=self)
+
+    def poll(self):
+        try:
+            candidate,result = self.results.get_nowait()
+            self.working = False; self.inspect_button.configure(state='normal')
+            if self.tree.selection() and self.candidate() == candidate:
+                self.model['values'] = (self.DEFAULT,) + tuple(result.get('models',[]))
+                self.status.set(f"{result['version']} | {result['authentication']}\n{result.get('model_source','')}")
+        except queue.Empty:
+            pass
+        self.timer = self.after(150,self.poll)
+
+    def connect(self):
+        try:
+            candidate = self.candidate()
+            model = self.model.get().strip()
+            model = '' if model == self.DEFAULT else model
+            validate_model(model)
+            old = self.app.flow.config(self.profile)
+            settings = dict(old,provider=candidate['provider'],model=model,executable=candidate['executable'],cli_command=candidate['cli_command'],endpoint='',encrypted_key='',key_env='',allow_ai=self.allow.get())
+            if candidate['provider'] == 'Ollama':
+                if not model:
+                    raise ValueError('Inspect Ollama and select an installed model, or enter its exact name.')
+                settings['endpoint'] = PROVIDERS['Ollama']
+            self.app.store.put(self.profile,'settings',settings,old.get('id'))
+            self.app.refresh()
+            self.app.status.set('Connected settings saved. Use Test AI connection to verify inference and model access.')
+            self.destroy()
+        except ValueError as exc:
+            messagebox.showerror('Connection settings',str(exc),parent=self)
+
+    def destroy(self):
+        if hasattr(self,'timer'):
+            self.after_cancel(self.timer)
+        super().destroy()
 
 class App(tk.Tk):
     def __init__(self, store=None):
@@ -107,6 +218,7 @@ class App(tk.Tk):
             self.status.set('Welcome — create a profile, import a resume, then configure research sources and AI.')
         self.after(200,self.poll)
         self.after(1500,self.tick)
+        self.after(600,self.discover_local_silent)
         self.protocol('WM_DELETE_WINDOW',self.close)
         self.bind('<Control-r>',lambda e:self.refresh())
 
@@ -384,16 +496,32 @@ class App(tk.Tk):
     def build_settings(self):
         p = self.pages['AI settings']
         ttk.Label(p,text='Connect your AI',font=('Segoe UI',16,'bold')).pack(anchor='w',pady=8)
-        ttk.Label(p,text='Choose a cloud API, a local model server or your installed Codex CLI. Consumer chat subscriptions do not supply API credentials.\nKeys saved here are encrypted with Windows DPAPI for this Windows user. Nothing is included in the public repository.',wraplength=1050).pack(anchor='w',pady=8)
+        ttk.Label(p,text='Use Detect local AI to connect installed Codex, Claude, Gemini or Ollama without typing installation paths. CLI connections reuse their own sign-in.\nCloud API connections remain available. Saved API keys use Windows account-bound encryption.',wraplength=1050).pack(anchor='w',pady=8)
+        self.local_text = tk.StringVar(value='Checking standard local AI installation paths…')
+        ttk.Label(p,textvariable=self.local_text,wraplength=1050).pack(anchor='w',pady=8)
         self.settings_text = tk.StringVar()
         ttk.Label(p,textvariable=self.settings_text,wraplength=1000).pack(anchor='w',pady=16)
         self.button(p,'Configure AI and search',self.settings_form)
+        self.button(p,'Detect local AI',self.local_setup)
         self.button(p,'Test AI connection',self.test_ai)
+
+    def discover_local_silent(self):
+        try:
+            self.local_candidates = discover()
+            names = list(dict.fromkeys(c['provider'] for c in self.local_candidates))
+            self.local_text.set('Detected: ' + ', '.join(names) + '. Select Detect local AI to connect.' if names else 'No supported local CLI found. Install and sign in to a CLI, then use Detect local AI, or configure a cloud API.')
+        except OSError:
+            self.local_candidates = []
+            self.local_text.set('Local scan could not complete. You can browse to an executable in settings.')
+
+    def local_setup(self):
+        self.discover_local_silent()
+        LocalAISetup(self,self.local_candidates)
 
     def settings_form(self):
         rows = self.store.list(self.pid,'settings')
         old = rows[0] if rows else {}
-        fields = [('provider','Provider',tuple(PROVIDERS)),('model','Exact model ID','entry'),('endpoint','Base URL (blank = provider default)','entry'),('key','API key (blank = keep saved key)','secret'),('key_env','Or API-key environment variable','entry'),('clear_key','Delete saved AI key','bool'),('executable','Codex CLI executable (.exe)','entry'),('allow_ai','Allow profile/resume data to selected AI','bool'),('enable_web','Enable Brave web research + AI','bool'),('search_key','Brave API key (blank = keep)','secret'),('search_key_env','Or Brave-key environment variable','entry'),('clear_search','Delete saved search key','bool')]
+        fields = [('provider','Provider',tuple(PROVIDERS)),('model','Exact model ID (CLI: blank = default)','entry'),('endpoint','Base URL (blank = provider default)','entry'),('key','API key (blank = keep saved key)','secret'),('key_env','Or API-key environment variable','entry'),('clear_key','Delete saved AI key','bool'),('executable','CLI executable (or use Detect local AI)','entry'),('allow_ai','Allow profile/resume data to selected AI','bool'),('enable_web','Enable Brave web research + AI','bool'),('search_key','Brave API key (blank = keep)','secret'),('search_key_env','Or Brave-key environment variable','entry'),('clear_search','Delete saved search key','bool')]
         def save(v):
             changed = old.get('provider') != v['provider']
             if changed and v['endpoint'] == old.get('endpoint'):
@@ -401,8 +529,18 @@ class App(tk.Tk):
             if changed and v['key_env'] == old.get('key_env'):
                 v['key_env'] = ''
             v['endpoint'] = v['endpoint'].strip() or PROVIDERS[v['provider']]
-            if v['provider'] != 'Codex CLI':
+            if v['provider'] not in CLI_PROVIDERS:
                 validate_url(v['endpoint'])
+            else:
+                validate_model(v['model'].strip())
+                if not changed and old.get('cli_command') and v['executable'] == old.get('executable'):
+                    v['cli_command'] = old['cli_command']
+                if not v['executable']:
+                    found = [c for c in discover() if c['provider'] == v['provider']]
+                    if not found:
+                        raise ValueError('No installation detected. Use Detect local AI or enter the executable path.')
+                    v.update(executable=found[0]['executable'],cli_command=found[0]['cli_command'])
+                launch_command(v)
             v['encrypted_key'] = protect(v.pop('key')) if v['key'] else ('' if changed or v['clear_key'] else old.get('encrypted_key',''))
             v['search_key'] = protect(v['search_key']) if v['search_key'] else ('' if v['clear_search'] else old.get('search_key',''))
             v.pop('key',None); v.pop('clear_key',None); v.pop('clear_search',None)
@@ -502,7 +640,8 @@ class App(tk.Tk):
         profile = self.store.profile(self.pid)
         self.profile_text.set('\n\n'.join(f'{k.replace("_"," ").title()}: {v}' for k,v in profile.items() if k != 'id'))
         conf = self.flow.config(self.pid)
-        self.settings_text.set(f"Provider: {conf.get('provider','Not configured')}\nModel: {conf.get('model','Not configured')}\nEndpoint: {conf.get('endpoint','')}\nAI sharing: {'Enabled' if conf.get('allow_ai') else 'Off'}\nWeb discovery: {'Enabled' if conf.get('enable_web') else 'Off'}")
+        model_text = conf.get('model') or ('CLI configured default' if conf.get('provider') in CLI_PROVIDERS else 'Not configured')
+        self.settings_text.set(f"Provider: {conf.get('provider','Not configured')}\nModel: {model_text}\nExecutable: {conf.get('executable','')}\nEndpoint: {conf.get('endpoint','')}\nAI sharing: {'Enabled' if conf.get('allow_ai') else 'Off'}\nWeb discovery: {'Enabled' if conf.get('enable_web') else 'Off'}")
         schedules = self.store.list(self.pid,'schedule')
         self.schedule_text.set('No schedule configured.' if not schedules else f"Schedule: {'Enabled' if schedules[0].get('enabled') else 'Disabled'} | {schedules[0].get('time')} {schedules[0].get('timezone')} | Next UTC: {schedules[0].get('next_run','')}\nAt most {schedules[0].get('limit',3)} AI jobs per run. Drafts require current job approval.")
 

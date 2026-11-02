@@ -53,9 +53,23 @@ The EXE is unsigned. Download only from this repository's releases and compare t
 | Grok | xAI Responses API | API key, exact model ID |
 | Ollama | Native `/api/chat` | Running local server, installed model name |
 | OpenAI-compatible | Chat Completions | Compatible base URL, model, optional key |
-| Codex CLI | Your installed `codex.exe` | Executable path, existing sign-in, model access |
+| Codex CLI | Your installed CLI | Automatic detection, existing sign-in, optional model ID |
+| Claude CLI | Your installed Claude Code | Automatic detection, existing sign-in, optional model ID |
+| Gemini CLI | Your installed Gemini CLI | Automatic detection, existing sign-in, optional model ID |
 
-Consumer chat subscriptions and API billing are separate. The app does not embed browser chat websites or reuse their cookies. Codex CLI uses its own supported local sign-in; no credentials are copied or bundled. Other local servers (such as LM Studio) can use the compatible interface. A service with a different protocol needs another adapter; “any AI” does not mean every proprietary interface is automatically compatible.
+Consumer chat subscriptions and API billing are separate. The app does not embed browser chat websites or reuse their cookies. CLI connections use each tool's supported local sign-in; no credentials are copied or bundled. Other local servers (such as LM Studio) can use the compatible interface. A service with a different protocol needs another adapter; “any AI” does not mean every proprietary interface is automatically compatible.
+
+### Automatically detect local AI
+
+JobTracker checks for supported installations when it starts. In **AI settings**, choose **Detect local AI**, select an installation, optionally choose **Inspect selected installation**, then **Connect selected**. Use **Test AI connection** to confirm actual inference. Discovery never installs software or runs an AI prompt; the connection test sends only fixed test text and can consume account usage.
+
+Detection uses the current user's PATH and standard per-user/native/npm installation folders. No developer username, private installation path or drive-wide scan is built in. Codex, Claude Code, Gemini CLI and Ollama are supported. Multiple installations are listed separately. npm commands are resolved to their installed package entry point and run through Node; `.cmd`, `.bat` and PowerShell shims are not executed. Node must already be installed for JavaScript-based CLIs. Nonstandard native locations can still be entered manually in settings.
+
+For a CLI, leave the model blank/default to use that CLI's configured default, or enter an exact model ID. Codex's available catalog can populate the model selector after inspection; catalog presence does not guarantee account access. A display label such as `6.1 Luna` is not an exact model ID. Claude and Gemini can use their existing defaults without a model list. Ollama inspection lists models from the running loopback server; choose an installed model explicitly.
+
+Installation detection and sign-in metadata do **not** prove the credentials still work. If the connection test reports an expired or invalid login, sign in again in a terminal using `codex login`, `claude auth login`, or `gemini`, then retest. JobTracker never logs out an account or refreshes/copies credentials on the user's behalf. It does not launch a hidden interactive login. Ollama must be running locally; detection does not start or install its service. A CLI sign-in does not supply the separate Brave Search API key.
+
+CLI document requests run in a temporary working directory, with prompt text passed on stdin rather than exposed in command-line arguments. Claude requests disable built-in tools, MCP connections and hooks for the request; Gemini adds text-only restrictions and a deny-tools policy without replacing system settings; Codex uses its read-only sandbox. No global CLI configuration is rewritten. CLI versions and enterprise policies may affect compatibility. Windows process ownership bounds child lifetimes; errors are summarized without recording raw CLI output or credentials.
 
 Base URL examples: `https://api.openai.com/v1`, `https://api.anthropic.com/v1`, `https://generativelanguage.googleapis.com/v1beta`, `https://api.x.ai/v1`, `http://127.0.0.1:11434` (Ollama), `http://127.0.0.1:1234/v1` (compatible local server). The app adds the provider-specific path. Enter a real model ID available on your account; no model is silently substituted. HTTP is permitted only on loopback; other endpoints require HTTPS.
 

@@ -12,3 +12,4 @@ data/
 private/
 *.log
 .impeccable/
+.serena/

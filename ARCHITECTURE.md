@@ -4,6 +4,7 @@
 
 - `store.py`: SQLite transactions, profile-scoped records, atomic job URL/source-key deduplication, job requirement hashes, immutable source resume versions, consistent database backups.
 - `ai.py`: provider-independent `generate(config, system, prompt) -> str`, timeout/size-bounded HTTPS requests, redirect refusal, DPAPI storage, separate Codex executable adapter. Add a provider by adding its name/default endpoint and request/response mapping; add contract tests before enabling it.
+- `local_ai.py`: passive per-user CLI discovery, npm manifest resolution, explicit version/sign-in/model probes, shell-free headless adapters and Windows-owned process trees. CLI launch commands are stored in the selected profile; tokens are not inspected. Metadata probes are separate from inference tests. Missing/expired credentials remain actionable user steps.
 - `research.py`: configurable company feeds, keyword/location matching, optional Brave discovery. Feed errors retain earlier records. No browser scraping or synthesized official-source verification.
 - `workflow.py`: source collection, exact-source validation for AI research, document approval checks, generation deduplication, durable run history and a profile lease. It is injectable for tests. Source material is treated as untrusted data in prompts; AI output is never executed.
 - `desktop.py`: English native forms, multi-profile UI, background worker queue, persistent timezone-aware scheduler. Tk widgets are touched only by the main thread. AI and networking run sequentially off the UI thread.

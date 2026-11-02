@@ -3,12 +3,10 @@ import base64
 import ctypes
 import json
 import os
-import subprocess
-import tempfile
-from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, quote
 from urllib.request import Request, build_opener, HTTPRedirectHandler
+from .local_ai import CLI_PROVIDERS, generate_cli
 
 PROVIDERS = {
     'OpenAI': 'https://api.openai.com/v1',
@@ -18,6 +16,8 @@ PROVIDERS = {
     'Ollama': 'http://127.0.0.1:11434',
     'OpenAI-compatible': 'http://127.0.0.1:1234/v1',
     'Codex CLI': '',
+    'Claude CLI': '',
+    'Gemini CLI': '',
 }
 
 class NoRedirect(HTTPRedirectHandler):
@@ -80,10 +80,10 @@ def secret(config):
 
 def generate(config, system, prompt, transport=request_json):
     provider, model = config.get('provider'), config.get('model','').strip()
-    if provider not in PROVIDERS or not model:
+    if provider not in PROVIDERS or (not model and provider not in CLI_PROVIDERS):
         raise ValueError('Select a provider and enter its exact model ID in AI settings.')
-    if provider == 'Codex CLI':
-        return _codex(config, system + '\n\n' + prompt)
+    if provider in CLI_PROVIDERS:
+        return generate_cli(config, system + '\n\n' + prompt)
     base = validate_url(config.get('endpoint',''))
     key = secret(config)
     if provider in ('OpenAI','Claude','Gemini','Grok') and not key:
@@ -107,15 +107,3 @@ def generate(config, system, prompt, transport=request_json):
     if not isinstance(text, str) or not text.strip():
         raise ValueError('The model returned no text. Check model compatibility or content restrictions.')
     return text.strip()
-
-def _codex(config, prompt):
-    exe = Path(config.get('executable',''))
-    if not exe.is_file() or exe.suffix.lower() != '.exe':
-        raise ValueError('Choose your installed Codex executable (.exe). Sign in with Codex separately.')
-    with tempfile.TemporaryDirectory(prefix='jobtracker-ai-') as folder:
-        output = Path(folder) / 'response.txt'
-        args = [str(exe), 'exec', '--skip-git-repo-check', '--sandbox','read-only','--ephemeral','-m',config['model'],'--output-last-message',str(output), '-']
-        result = subprocess.run(args, input=prompt, text=True, encoding='utf-8', stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=folder, timeout=300, creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0), shell=False)
-        if result.returncode or not output.exists():
-            raise RuntimeError('Codex CLI failed. Check its sign-in, model access and installation.')
-        return output.read_text(encoding='utf-8').strip()

@@ -21,6 +21,9 @@ if '--settings' in sys.argv:
 if '--schedule' in sys.argv:
     a.tabs.select(a.pages['Research & schedule'])
     a.schedule_form()
+if '--local-ai' in sys.argv:
+    a.tabs.select(a.pages['AI settings'])
+    a.local_setup()
 a.update()
 Path('build/gui-state.json').write_text(json.dumps(dict(hwnd=a.winfo_id(),width=a.winfo_width(),height=a.winfo_height(),tabs=len(a.tabs.tabs()))))
 if '--capture' in sys.argv:
